@@ -6,13 +6,19 @@ import time
 import random
 
 # ======================================================
-# ★ [나만의 비밀 공간] 키 입력
+# ★ [핵심 수정] 클라우드 비밀 금고(Secrets) 연결
 # ======================================================
-MY_NAVER_ID = "THwQmlK07cm4_TqoUNGh"       # 예: "X7aB..."
-MY_NAVER_SECRET = "RRFNQjPLAP"   # 예: "Pw12..."
+# 서버에 저장된 키가 있으면 가져오고, 없으면(내 컴퓨터면) 빈칸으로 둡니다.
+try:
+    MY_NAVER_ID = st.secrets["MY_NAVER_ID"]
+    MY_NAVER_SECRET = st.secrets["MY_NAVER_SECRET"]
+except:
+    # 로컬이나 키 설정이 안 되어 있을 경우
+    MY_NAVER_ID = ""
+    MY_NAVER_SECRET = ""
 
 # ======================================================
-# 페이지 설정 & 디자인
+# 페이지 설정 & 디자인 (CSS)
 # ======================================================
 st.set_page_config(page_title="최저가 사냥꾼", page_icon="📉", layout="wide")
 
@@ -46,16 +52,23 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ======================================================
-# 사이드바
+# 사이드바 (자동 입력 로직)
 # ======================================================
 with st.sidebar:
     st.header("⚙️ 설정")
+    
+    # Secrets에서 가져온 키가 있으면 그걸 기본값으로 넣음
     default_id = MY_NAVER_ID if MY_NAVER_ID else ""
     default_secret = MY_NAVER_SECRET if MY_NAVER_SECRET else ""
+
     client_id = st.text_input("Client ID", value=default_id)
     client_secret = st.text_input("Client Secret", value=default_secret, type="password")
+    
     st.divider()
-    st.info("💡 접속 차단을 막기 위해 검색 시 약간의 딜레이(0.5초)가 있습니다.")
+    if default_id:
+        st.success("✅ 서버에 저장된 보안 키가 적용되었습니다!")
+    else:
+        st.info("💡 키가 입력되지 않았습니다.")
 
 # ======================================================
 # 메인 화면
@@ -64,24 +77,24 @@ st.title("📉 실시간 최저가 & 그래프 탐색기")
 
 col1, col2 = st.columns([4, 1])
 with col1:
-    keyword = st.text_input("상품명 입력", placeholder="예: 신라면 20개, 아이폰 15")
+    keyword = st.text_input("상품명 입력", placeholder="예: 신라면 20개, 갤럭시 S24")
 with col2:
     st.write("")
     st.write("")
     search_btn = st.button("검색 시작 🚀", type="primary", use_container_width=True)
 
 # ======================================================
-# 검색 로직
+# 검색 로직 (봇 탐지 회피 + 4대장 링크)
 # ======================================================
 if search_btn:
     if not client_id or not client_secret:
-        st.error("👈 API 키를 입력해주세요!")
+        st.error("👈 왼쪽 메뉴에 API 키를 입력해주세요! (Secrets 설정을 확인하세요)")
     elif not keyword:
         st.warning("상품명을 입력해주세요.")
     else:
         st.divider()
         
-        # 1. 봇 탐지 회피를 위한 랜덤 딜레이 (사람인 척 뜸 들이기)
+        # 1. 랜덤 딜레이 (사람인 척)
         time.sleep(random.uniform(0.3, 0.8))
 
         encText = urllib.parse.quote(keyword)
@@ -89,20 +102,12 @@ if search_btn:
 
         request = urllib.request.Request(url)
         
-        # 2. ★ 핵심 위장술: 헤더 대폭 강화 ★
+        # 2. 헤더 위장 (네이버 속이기)
         request.add_header("X-Naver-Client-Id", client_id)
         request.add_header("X-Naver-Client-Secret", client_secret)
-        
-        # 브라우저 정보 (User-Agent)
         request.add_header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-        
-        # 출신 성분 (Referer): "저 네이버 쇼핑에서 왔는데요?" 라고 거짓말
         request.add_header("Referer", "https://shopping.naver.com/")
-        
-        # 언어 설정 (Accept-Language): "저 한국 사람입니다"
         request.add_header("Accept-Language", "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7")
-        
-        # 수락 타입 (Accept)
         request.add_header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
 
         try:
@@ -166,7 +171,7 @@ if search_btn:
                     st.error("API 접속 실패")
         except Exception as e:
             if "HTTP Error 403" in str(e) or "HTTP Error 429" in str(e):
-                st.error("🚨 네이버 보안 정책에 의해 잠시 차단되었습니다.")
-                st.info("💡 팁: 스마트폰 핫스팟으로 연결하면 IP가 바뀌어 즉시 해결됩니다!")
+                st.error("🚨 네이버 서버가 접속을 차단했습니다.")
+                st.info("클라우드 서버 IP가 일시적으로 막혔을 수 있습니다. 잠시 후 다시 시도해보세요.")
             else:
                 st.error(f"오류 발생: {e}")

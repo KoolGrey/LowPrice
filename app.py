@@ -6,19 +6,18 @@ import time
 import random
 
 # ======================================================
-# ★ [핵심 수정] 클라우드 비밀 금고(Secrets) 연결
+# ★ [클라우드 배포용] 비밀 금고(Secrets) 연결
 # ======================================================
-# 서버에 저장된 키가 있으면 가져오고, 없으면(내 컴퓨터면) 빈칸으로 둡니다.
 try:
     MY_NAVER_ID = st.secrets["MY_NAVER_ID"]
     MY_NAVER_SECRET = st.secrets["MY_NAVER_SECRET"]
 except:
-    # 로컬이나 키 설정이 안 되어 있을 경우
+    # 내 컴퓨터에서 돌릴 때 (Secrets가 없을 때)
     MY_NAVER_ID = ""
     MY_NAVER_SECRET = ""
 
 # ======================================================
-# 페이지 설정 & 디자인 (CSS)
+# 디자인 (CSS)
 # ======================================================
 st.set_page_config(page_title="최저가 사냥꾼", page_icon="📉", layout="wide")
 
@@ -52,12 +51,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ======================================================
-# 사이드바 (자동 입력 로직)
+# 사이드바
 # ======================================================
 with st.sidebar:
     st.header("⚙️ 설정")
     
-    # Secrets에서 가져온 키가 있으면 그걸 기본값으로 넣음
     default_id = MY_NAVER_ID if MY_NAVER_ID else ""
     default_secret = MY_NAVER_SECRET if MY_NAVER_SECRET else ""
 
@@ -66,9 +64,9 @@ with st.sidebar:
     
     st.divider()
     if default_id:
-        st.success("✅ 서버에 저장된 보안 키가 적용되었습니다!")
+        st.success("✅ 서버 키 적용 완료!")
     else:
-        st.info("💡 키가 입력되지 않았습니다.")
+        st.info("💡 키를 입력하거나 Secrets를 설정하세요.")
 
 # ======================================================
 # 메인 화면
@@ -84,25 +82,23 @@ with col2:
     search_btn = st.button("검색 시작 🚀", type="primary", use_container_width=True)
 
 # ======================================================
-# 검색 로직 (봇 탐지 회피 + 4대장 링크)
+# 검색 로직
 # ======================================================
 if search_btn:
     if not client_id or not client_secret:
-        st.error("👈 왼쪽 메뉴에 API 키를 입력해주세요! (Secrets 설정을 확인하세요)")
+        st.error("👈 API 키가 없습니다. (Secrets 설정을 확인하세요)")
     elif not keyword:
         st.warning("상품명을 입력해주세요.")
     else:
         st.divider()
         
-        # 1. 랜덤 딜레이 (사람인 척)
+        # 딜레이
         time.sleep(random.uniform(0.3, 0.8))
 
         encText = urllib.parse.quote(keyword)
         url = f"https://openapi.naver.com/v1/search/shop.json?query={encText}&display=30&start=1&sort=asc"
 
         request = urllib.request.Request(url)
-        
-        # 2. 헤더 위장 (네이버 속이기)
         request.add_header("X-Naver-Client-Id", client_id)
         request.add_header("X-Naver-Client-Secret", client_secret)
         request.add_header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
@@ -134,8 +130,11 @@ if search_btn:
                                 image = item['image']
                                 
                                 product_id = item['productId']
+                                
+                                # ★ [핵심 수정] 링크 생성 규칙 변경 (/catalog/ -> /product/)
                                 if item['productType'] == '2': 
-                                    naver_link = f"https://search.shopping.naver.com/catalog/{product_id}"
+                                    # 이 주소가 최신 통합 주소입니다. (오류 해결)
+                                    naver_link = f"https://search.shopping.naver.com/product/{product_id}"
                                     is_catalog = True
                                 else:
                                     naver_link = item['link']
@@ -171,7 +170,6 @@ if search_btn:
                     st.error("API 접속 실패")
         except Exception as e:
             if "HTTP Error 403" in str(e) or "HTTP Error 429" in str(e):
-                st.error("🚨 네이버 서버가 접속을 차단했습니다.")
-                st.info("클라우드 서버 IP가 일시적으로 막혔을 수 있습니다. 잠시 후 다시 시도해보세요.")
+                st.error("🚨 네이버 서버 차단됨 (잠시 대기 필요)")
             else:
                 st.error(f"오류 발생: {e}")
